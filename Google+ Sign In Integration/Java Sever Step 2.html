@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+    <link rel="stylesheet" type="text/css" href="/code.css" />
+  </head>
+  <body>
+<h1>Step 2: Add support for generating connections</h1>
+
+<p>Just being able to know whether you alone are free is not fun at all.
+Let's add people to the mix by generating connections for the current user
+when we save their profile.</p>
+
+<p>There is some code already provided in the FriendsServlet that will retrieve
+the user information from the database (doGet). This is provided in the interest
+of time and allowing us to focus on the graph functionality.</p>
+
+<h2>Add the API calls to the client</h2>
+
+<p>As was done before, you need to connect the JavaScript client to the server 
+usign AJAX calls.</p>
+
+<p>In app.js, you will need to implement the function for showing the user's 
+connections.  The following code is an implementation of the client method:</p>
+
+<pre><code>// showFriends code goes here
+$.ajax({
+  type: 'GET',
+  url: this.rootUrl + this.apiBase  + '/friends',
+  contentType: 'application/json',
+  success: function(result) {
+    $('#friendsList').empty();
+    for (var i=0; i&lt;result.length; i++){
+      var html = '&lt;li&gt;' + helper.getProfileHTML(result[i]) + '(' +
+        (result[i].free ? 'Free/Bored' : 'Do not disturb') + ')&lt;/li&gt;';
+      $(html).appendTo('#friendList');
+    }
+    $('#friends').show();
+  },
+});
+</code></pre>
+
+<p>This code reuses the code for rendering a user to render a connected person.</p>
+
+<p>Now that you have setup the API call and rendering code, you will need to make
+a implement the API endpoint.</p>
+
+<p>Start in the FriendsServlet.java file stored in the com.google.plus.sample.free</p>
+
+<h2>1. Add a call to generate friends.</h2>
+
+<p>The POST command, handled in the doPost method, is there to trigger the
+user being connected with their friends. </p>
+
+<p>The following code shows you retrieving the user from the database
+and then getting the access token for passing into a function to
+query the API.</p>
+
+<pre><code>try {
+  Long userId = Long.parseLong(req.getParameter("userId"));
+  String accessToken = req.getParameter("accessToken");
+  User user = ofy().load().key(User.key(userId)).safeGet();
+
+  // Create a credential object.
+  GoogleCredential credential = new GoogleCredential.Builder()
+      .setJsonFactory(JSON_FACTORY).setTransport(TRANSPORT)
+      .setClientSecrets(CLIENT_ID, CLIENT_SECRET).build();
+
+  credential.setAccessToken(accessToken);
+
+  generateFriends(user, credential);
+  sendResponse(req, resp, new Message("success"), "free#message");
+} catch (IOException e) {
+  sendError(resp, 500, e.getMessage());
+}
+</code></pre>
+
+<h2>2. List the user's connections</h2>
+
+<p>For the next steps, you will be adding code to the generateFriends function
+which will encapsulate the Google API call and writes to the database.
+First, make API calls against the Google+ API to retrieve the people visible to 
+this app:</p>
+
+<pre><code>// Simple but inefficient way of building the friends list
+Plus plus = new Plus.Builder(TRANSPORT, JSON_FACTORY, credential).build();
+Plus.People.List get;
+List&lt;DirectedUserToUserEdge&gt; friends = ofy().load()
+    .type(DirectedUserToUserEdge.class)
+    .filter("ownerUserId", user.getId()).list();
+ofy().delete().entities(friends).now();
+friends = new ArrayList&lt;DirectedUserToUserEdge&gt;();
+
+String pageToken = null;
+
+List&lt;User&gt; users = ofy().load().type(User.class).list();
+HashMap&lt;String, User&gt; usersByGoogleId = new HashMap&lt;String, User&gt;(users.size());
+for (User freeUser : users) {
+  usersByGoogleId.put(freeUser.getGoogleUserId(), freeUser);
+}
+</code></pre>
+
+<p>You will now have a list of connected users.</p>
+
+<h2>3. Save the user's connections</h2>
+
+<p>Now that you have the user's connections, you should save them to
+the database so that you can query for their friends within this 
+app.</p>
+
+<p>The following code will take the list of people from the last API
+calls and will then add them to the Free database.</p>
+
+<pre><code>do {
+  get = plus.people().list(user.getGoogleUserId(), "visible")
+      .setPageToken(pageToken);
+  PeopleFeed feed = get.execute();
+  pageToken = feed.getNextPageToken();
+
+  for (Person googlePlusPerson : feed.getItems()) {
+  User friend = usersByGoogleId.get(googlePlusPerson.getId());
+    DirectedUserToUserEdge friendEdge = new DirectedUserToUserEdge();
+    friendEdge.setOwnerUserId(user.getId());
+    friendEdge.setFriendGoogleUserId(googlePlusPerson.getId());
+    if (friend != null) {
+      friendEdge.setFriendUserId(friend.getId());
+    }
+    friends.add(friendEdge);
+  }
+  ofy().save().entities(friends).now();
+  ofy().clear();
+
+  List&lt;DirectedUserToUserEdge&gt; reverseFriends = ofy().load()
+      .type(DirectedUserToUserEdge.class)
+      .filter("friendGoogleUserId", user.getGoogleUserId()).list();
+  for (DirectedUserToUserEdge reverseEdge : reverseFriends) {
+    reverseEdge.setFriendUserId(user.getId());
+  }
+  ofy().save().entities(reverseFriends).now();
+  ofy().clear();
+} while (pageToken != null);
+</code></pre>
+
+<p>You have now fully implemented the generateFriends function and can
+remove the NOOP exception.</p>
+
+<p>At this point, your app will be able to store and save the status
+of connections. If you want to test the app with some of your
+accounts and with your friends, it's now possible!</p>
+
+<hr />
+
+<p>Move on to <a href="step3.html"><strong>Step 3</strong></a></p>
+  </body>
+</html>

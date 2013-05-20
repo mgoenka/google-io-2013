@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+    <link rel="stylesheet" type="text/css" href="/code.css" />
+  </head>
+  <body>
+<h1>Connecting the application</h1>
+
+<p>First, we'll need to set up the JavaScript client so that it can make API 
+queries to Google.</p>
+
+<p>Start in <strong>war/index.html</strong>, this is where the code for the button and API
+calls needs to be added. You will find a comment indicating where the
+sign-in button goes, uncomment the following code, replacing 
+YOUR_CLIENT_ID with the one from the Google API console from the intro step.</p>
+
+<pre><code>      &lt;!-- sign-in button goes here --&gt;
+      &lt;span class="g-signin"
+          data-scope="https://www.googleapis.com/auth/plus.login"
+          data-requestvisibleactions="http://schemas.google.com/AddActivity"
+          data-clientId="YOUR_CLIENT_ID"
+          data-accesstype="offline"
+          data-callback="onSigninCallback"
+          data-theme="dark"
+          data-cookiepolicy="single_host_origin"&gt;
+      &lt;/span&gt;
+</code></pre>
+
+<h2>Add Google+ and Google API Access</h2>
+
+<p>In order to access the Google APIs, you must load a script from Google.
+The following code will load the Google API script and the Google+ 
+script for the sign-in button. Uncomment the following code at the end of 
+<strong>war/index.html</strong>:</p>
+
+<pre><code>// Async load Google API scripts
+(function() {
+  var po = document.createElement('script'); po.type = 'text/javascript'; po.async = true;
+  po.src = 'https://apis.google.com/js/auth:plusone.js?onload=startApp';
+  var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+})();
+</code></pre>
+
+<p>The scripts to load the button should now be included and the button will 
+render if you run the application.</p>
+
+<h2>Add a callback handler</h2>
+
+<p>When the sign-in button succeeds or fails, it will trigger a callback function.
+You have already specified this callback in the data-callback parameter on
+the sign-in button so that it will call onSigninCallback. Uncomment the callback
+for the global sign-in callback handler:</p>
+
+<pre><code>// Global callback handler for signin 
+function onSigninCallback(result){
+  helper.onSigninCallback(result);
+}
+</code></pre>
+
+<p>This global callback will trigger a helper function specified in app.js. Open
+<strong>war/js/app.js</strong> and uncomment the following lines:</p>
+
+<pre><code>    // Insert signin callback code here
+    if (authResult['access_token']) {
+      console.log("Result from sign-in:");
+      console.log(authResult);
+      // Setup the base url for API calls
+      this.setBaseUrl();
+      this.authResult = authResult;
+
+      // Success.
+      // Hide the sign-in button
+      $('#gConnect').hide();
+
+      // Reflect the user profile
+      this.connect();
+    } else if (authResult['error']) {
+      // You can handle various error conditions here
+    }
+</code></pre>
+
+<p>The site now will load and when you click the sign-in button, you should be
+returned an access token. You can look at the current access token by opening
+up the JavaScript console in the browser and looking at the logs indicating
+"Result from sign-in:". If there is an access_token member in the logged object, 
+your client has successfully authenticated with the Google APIs.</p>
+
+<h2>Add the connect API to the client</h2>
+
+<p>You are ready now to connect send the authorization code to the server
+in order to authorize the server.</p>
+
+<p>The helper.connect function will be called next to access the API endpoint for
+connecting the client to the server. Uncomment the following code in 
+<strong>war/js/app.js</strong> to enable the connect API call.</p>
+
+<pre><code>  console.log("Connect begin");
+  $.ajax({
+    type: 'POST',
+    url: this.rootUrl + this.apiBase  + '/connect',
+    contentType: 'application/octet-stream; charset=utf-8',
+    success: function(result) {
+      helper.user = result;
+      var html = helper.getProfileHTML(result);
+      $('#profileArea').html(html);
+      $('#disconnect').show();
+      $('#authButtons').show();
+      helper.isFree = result.free;
+      helper.toggleFreeUI();
+
+      // Render the interactive post button
+      helper.renderInteractivePost();
+
+      // Give the DB a second to crunch!
+      setTimeout("helper.showFriends()",1500);
+    },
+    processData: false,
+    data: JSON.stringify(this.authResult, function(key, value){
+        return value;
+    })
+  });
+</code></pre>
+
+<p>What this does is make a POST message to the api/connect endpoint
+on the server. Currently, the code is not implemented on the server
+so you will see an error returned.</p>
+
+<p>You now have API calls working on the client and are ready to work
+on the server to handle the API callback.</p>
+
+<h2>Configure the server variables</h2>
+
+<p>The application is layed out in a way that each of the API handlers will 
+inherit from a special superclass, JsonRestServlet, that handles various
+operations such as parsing JSON, handling HTTP requests, and sending
+HTTP responses.</p>
+
+<p>Because the other classes will inherit from this class, we can conveniently 
+store the client ID and client sercret in it. If you haven't already, open 
+<strong>src/com/google/plus/samples/free/JsonRestServlet.java</strong> and update the 
+CLIENT_ID and CLIENT_SECRET parameters to match the ones in your API console.</p>
+
+<h2>Implement /api/connect endpoint handler</h2>
+
+<p>Now that the JsonRestServlet is setup to contain the API keys, you can 
+implement the /api/connect endpoint handler.</p>
+
+<p>This endpoint will accept a token as a POST command and will then use that
+token to get authorization credentials and store the user.</p>
+
+<h3>Read the token from the client</h3>
+
+<p>First, you will need to implement the POST handler in the /api/connect endpoint. 
+This method will:</p>
+
+<ul>
+<li>Read the token data from the request</li>
+<li>Setup the credentials for OAuth</li>
+<li>Upgrade the token data from the request if you don't have credentials</li>
+<li>Return JSON to the client representing the signed-in user.</li>
+</ul>
+
+<p>Uncomment the following code in <strong>src/com/google/plus/sample/free/ConnectServlet.java</strong>
+which is contained in the <strong>doPost</strong> method:</p>
+
+<pre><code>// Retrieve the token from the POST.
+TokenData accessToken = null;
+try {
+  accessToken = Jsonifiable.fromJson(req.getReader(), TokenData.class);
+} catch (IOException e) {
+  sendError(resp, 400, "Unable to read auth result from request body");
+}
+
+// Create a credential object.
+GoogleCredential credential = new GoogleCredential.Builder()
+    .setJsonFactory(JSON_FACTORY).setTransport(TRANSPORT)
+    .setClientSecrets(CLIENT_ID, CLIENT_SECRET).build();
+
+// Upgrade the token if we don't already have credentials for this user.
+try {
+  if (accessToken.code != null) {
+    // exchange the code for a token (Web Frontend)
+    GoogleTokenResponse tokenFromExchange = exchangeCode(accessToken);
+    credential.setFromTokenResponse(tokenFromExchange);
+  } else {
+  if (accessToken.access_token == null) {
+      sendError(resp, 400, "Missing access token in request.");
+  }
+
+    // use the token received from the client
+    credential.setAccessToken(accessToken.access_token)
+        .setRefreshToken(accessToken.refresh_token)
+        .setExpiresInSeconds(accessToken.expires_in)
+        .setExpirationTimeMilliseconds(accessToken.expires_at);
+  }
+  // ensure that we consider logged in the user that owns the access token
+  String tokenGoogleUserId = verifyToken(credential);
+  User user = saveTokenForUser(tokenGoogleUserId, credential);
+  // save the user in the session
+  HttpSession session = req.getSession();
+  session.setAttribute(CURRENT_USER_SESSION_KEY, user.id);
+  Queue queue = QueueFactory.getDefaultQueue();
+  queue.add(withUrl("/api/friends")
+      .method(TaskOptions.Method.POST)
+      .param("accessToken", accessToken.access_token)
+      .param("userId", user.getId().toString()));
+  sendResponse(req, resp, user);
+} catch (TokenVerificationException e) {
+  sendError(resp, 401, e.getMessage());
+} catch (TokenResponseException e) {
+  sendError(resp, 500, "Failed to upgrade the authorization code.");
+} catch (TokenDataException e) {
+  sendError(resp, 500,
+      "Failed to read token data from Google. " + e.getMessage());
+} catch (IOException e) {
+  sendError(resp, 500, e.getMessage());
+} catch (GoogleApiException e) {
+  sendError(resp, 500, "Failed to query the Google+ API: " +
+      e.getMessage());
+}
+</code></pre>
+
+<p>Before this code will work, you need to implement the method for exchanging
+the authorization code for an access and refresh token <em>and</em> you will need 
+to implement the code for constructing a User object to return to the client.</p>
+
+<h4>Implement a code exchanger</h4>
+
+<p>Now, you need to implement exchangeCode.</p>
+
+<p>In the previous step, we called <strong>exchangeCode</strong> and so for this step we will 
+implement it. Find the function <strong>exchangeCode</strong> and replace it with the following
+code:</p>
+
+<pre><code>try {
+  // Upgrade the authorization code into an access and refresh token.
+  GoogleTokenResponse tokenResponse = new GoogleAuthorizationCodeTokenRequest(
+      TRANSPORT, JSON_FACTORY, CLIENT_ID, CLIENT_SECRET, accessToken.code,
+      "postmessage").execute();
+  return tokenResponse;
+} catch (IOException e) {
+  throw new TokenDataException(e.getMessage());
+}
+</code></pre>
+
+<p>Now that you have exchanged the token, you are ready to use it to make API
+calls against the Google APIs.</p>
+
+<h4>Retrieve and save the user information</h4>
+
+<p>Now that we are authorized to make API calls, it's time to retrieve and store
+the user information. The following API call should be added to the doPost function.</p>
+
+<pre><code>  User user = saveTokenForUser(tokenGoogleUserId, credential);
+</code></pre>
+
+<h4>Save the user's information</h4>
+
+<p>The <strong>saveTokenForUser</strong> method will perform the following steps:</p>
+
+<ul>
+<li>Try to retrieve the user from the database</li>
+<li>If the user doesn't exist...
+<ul>
+<li>Construct the Google+ client</li>
+<li>Retrieve the user's profile using the client</li>
+<li>Construct a user from the profile information</li>
+</ul></li>
+<li>Update the user's credentials for API calls</li>
+<li>Return the user</li>
+</ul>
+
+<p>Uncomment the following code in the <strong>saveTokenForUser</strong> method to
+implement this functionality:</p>
+
+<pre><code>User user = ofy().load().type(User.class)
+    .filter("googleUserId", tokenGoogleUserId).first().get();
+if (user == null) {
+  // Register a new user.  Collect their Google profile info first.
+  Plus plus = new Plus.Builder(TRANSPORT, JSON_FACTORY, credential).build();
+  Person profile;
+  Plus.People.Get get;
+  try {
+    get = plus.people().get("me");
+    profile = get.execute();
+  } catch (IOException e) {
+    throw new GoogleApiException(e.getMessage());
+  }
+  user = new User();
+  user.setGoogleUserId(profile.getId());
+  user.setGoogleDisplayName(profile.getDisplayName());
+  user.setGooglePublicProfileUrl(profile.getUrl());
+  user.setGooglePublicProfilePhotoUrl(profile.getImage().getUrl());
+}
+//
+user.setGoogleAccessToken(credential.getAccessToken());
+if (credential.getRefreshToken() != null) {
+  user.setGoogleRefreshToken(credential.getRefreshToken());
+}
+user.setGoogleExpiresAt(credential.getExpirationTimeMilliseconds());
+user.setGoogleExpiresIn(credential.getExpiresInSeconds());
+ofy().save().entity(user).now();
+return user;
+
+User user = ofy().load().type(User.class)
+    .filter("googleUserId", tokenGoogleUserId).first().get();
+if (user == null) {
+  // Register a new user.  Collect their Google profile info first.
+  Plus plus = new Plus.Builder(TRANSPORT, JSON_FACTORY, credential).build();
+  Person profile;
+</code></pre>
+
+<p>Now the user has been created and the database will have it stored.</p>
+
+<h3>Save the user in the session and return the user to clients</h3>
+
+<p>The user is stored in the session for authentication and API calls
+later on. Next, an API call is made to the friends endpoint to list
+and store friends. Finally, the user is returned to the client. In
+JavaScript, this is used in the model for reflecting back the user.</p>
+
+<p>The following code will save the user in the session and close out
+the code block for this handler.</p>
+
+<p>At this point, your server will be receiving the user information back after 
+connect and will be saving the user to the database. The user will be returned
+to the client as JSON. If you run the site now and look at the JavaScript 
+console, you will see the data representing the user get logged.</p>
+
+<h2>Render the server response in the client</h2>
+
+<p>When the AJAX call completes in connect, the client will receive JSON 
+describing the currently signed-in user. </p>
+
+<p>You have already written the code that will pass the user object in connect, now
+you just need to implement it in <strong>war/js/app.js</strong>. Uncomment the following code 
+to render the user data:</p>
+
+<pre><code>  // Render profile code goes here
+  var html = '&lt;a target="_blank" href="' + user.googlePublicProfileUrl + 
+      '"&gt;' + '&lt;img class="vmiddle" src="' + 
+      user.googlePublicProfilePhotoUrl + '" /&gt;' + '&lt;/a&gt;';
+  return html;
+</code></pre>
+
+<p>Now, when you run the application, your profile will be reflected back to you
+after you have signed in.</p>
+
+<h2>Render an interactive post</h2>
+
+<p>Because the user is signed in, you can now show and render the interactive
+post button to invite people to connect with the app.</p>
+
+<p>The following code shows how a button can be created in a div to be rendered
+by the Google APIs. Add the following code to war/index.html:</p>
+
+<pre><code>   &lt;!-- invite button goes here --&gt;
+   &lt;div id="invite"&gt;
+   &lt;button id="inviteButton"&gt;
+     Invite your friends
+   &lt;/button&gt;
+</code></pre>
+
+<p>If you haven't already, open <strong>war/js/app.js</strong> and find the following line:</p>
+
+<pre><code>    'clientId': 'YOUR_CLIENT_ID',
+</code></pre>
+
+<p>You will need to replace this with your client ID from the Google APIs console.</p>
+
+<p>Now you just need to render the interactive post. The <strong>renderInteractivePost</strong> 
+function is called done after the user has connected to Google+ to render the post.
+Uncomment the following code in the <strong>renderInteractivePost</strong> function to render
+the post:</p>
+
+<pre><code>   // Render interactive post code goes here.
+   var options = {
+     'clientid': this.clientId,
+     'contenturl': this.rootUrl + '/invite.jsp?userId=' + this.user.id,
+     'contentdeeplinkid': '/',
+     'prefilltext': 'Let your friends know you\'re free!',
+     'calltoactionlabel': 'Join',
+     'calltoactionurl': this.rootUrl,
+     'calltoactiondeeplinkid': '/',
+     'requestvisibleactions': 'http://schemas.google.com/AddActivity',
+     'scope': 'https://www.googleapis.com/auth/plus.login',
+     'cookiepolicy': 'single_host_origin'
+   };
+
+   gapi.interactivepost.render('invite', options);
+</code></pre>
+
+<p>Now, if you click the Connections section, the interactive post will render.
+<strong>Note</strong> The post will not work until you have published the site.</p>
+
+<h2>Implement the target page for the interactive post.</h2>
+
+<p>You will need to render schema.org data for the interactive post.  The file
+<strong>war/invite.jsp</strong> currently will not render this code. Uncomment the following 
+code to prepare the page to write schema markup:</p>
+
+<pre><code> Long userId = 0L;
+ User source = null;
+ String imageUrl = "";
+ String name = "";
+
+ try {
+   userId = Long.parseLong(request.getParameter("userId"));
+   source = ofy().load().type(User.class).id(userId).get();
+ } catch (NumberFormatException e) {
+   source = null; 
+ }
+
+ if (source != null) {
+   imageUrl = source.googlePublicProfilePhotoUrl;
+   name = "Let " + source.googleDisplayName + " know you're free!";
+ } else {
+   imageUrl = "/images/interactivepost-icon.png";
+   name = "";
+ }
+</code></pre>
+
+<p>Uncomment the following code to render the schema on the page:</p>
+
+<pre><code> &lt;!-- insert code for rendering schema here --&gt;
+ &lt;!DOCTYPE html&gt;
+ &lt;html&gt;
+ &lt;head&gt;
+   &lt;script type="text/javascript"&gt;
+     window.location.href = 'index.html';
+   &lt;/script&gt;
+   &lt;title&gt;&lt;%= name %&gt;&lt;/title&gt;
+ &lt;/head&gt;
+ &lt;body itemscope itemtype="http://schema.org/Thing"&gt;
+   &lt;h1 itemprop="name"&gt;&lt;%= name %&gt;&lt;/h1&gt;
+   &lt;img itemprop="image" src="&lt;%= imageUrl %&gt;" /&gt;
+ &lt;/body&gt;
+ &lt;/html&gt;
+</code></pre>
+
+<p>Now, when you publish the site live and click invite, the interactive post 
+should render from the connect tab on the site.</p>
+
+<hr />
+
+<p>Move on to <a href="step2.html"><strong>Step 2</strong></a></p>
+  </body>
+</html>

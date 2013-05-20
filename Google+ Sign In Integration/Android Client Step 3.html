@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+    <link rel="stylesheet" type="text/css" href="/code.css" />
+  </head>
+  <body>
+<h1>Part III: Listing friends and their status</h1>
+
+<p>What you will be doing in this step is setting up the API calls for retrieving
+the current user's friends from the API endpoint.</p>
+
+<p>Start in the file FreeActivity.java</p>
+
+<h2>Step 1. Start a timer for updating the list of friends</h2>
+
+<p>Find the <strong>setAuthenticatedProfile</strong> method and uncomment the code for 
+refreshing the friends shown to the user:</p>
+
+<pre><code>public void setAuthenticatedProfile(User profile) {
+  mFreeUser = profile;
+
+  supportInvalidateOptionsMenu();
+
+  // For profile
+  updateFreeButton();
+  updateProfile();             
+
+  // For friends
+  mTimer.schedule(new TimerTask() {
+        @Override
+        public void run() {
+          mFriendsLoader.forceLoad();   
+        }
+    }, 0, 15000);
+}
+</code></pre>
+
+<h2>Step 2. Start the Loader</h2>
+
+<p>The loader was already initialized in onCreate so the methods for the loader 
+will be invoked. Currently, they don't do anything. Start by uncommenting
+<strong>onCretateLoader</strong>:</p>
+
+<pre><code>public Loader&lt;List&lt;User&gt;&gt; onCreateLoader(int id, Bundle bundle) {
+  return new JsonTaskLoader&lt;List&lt;User&gt;&gt;(
+      this, 
+      ApiClient.USER_FRIENDS_LIST, 
+      new TypeToken&lt;ArrayList&lt;User&gt;&gt;() {}.getType(),
+      true);
+}
+</code></pre>
+
+<p>This will initialize the asynchronous loader with an empty list.</p>
+
+<h2>Step 3. Handle reset for when the loader has restarted</h2>
+
+<p>When the loader resets, clear the friends list. The following code should
+be uncommented in <strong>onLoaderReset</strong> to clear the list of friends shown as
+free.</p>
+
+<pre><code>public void onLoaderReset(Loader&lt;List&lt;User&gt;&gt; loader) {
+  if (mFriendFragment == null || mFriendFragment.mFriends == null){
+    return;
+  }
+  mFriendFragment.mFriends.clear();
+}
+</code></pre>
+
+<h2>Step 4. Update friends images when the loader completes</h2>
+
+<p>Now that the loader is being constructed, the loader will return visible
+people from the Google+ API through a back-end query. Uncomment the 
+onLoadFinished function to update the friend fragment with UI for the 
+current user's visible people.</p>
+
+<pre><code>public void onLoadFinished(Loader&lt;List&lt;User&gt;&gt; loader, List&lt;User&gt; friends) {
+  if (mFriendFragment == null || mFriendFragment.mFriends == null){
+    return;
+  }
+  mFriendFragment.mFriends.clear();
+
+  if (friends != null) {
+    for (int i=0; i &lt; friends.size(); i++){
+      friends.get(i).googlePublicProfilePhotoUrl = 
+      friends.get(i).googlePublicProfilePhotoUrl.
+      replace("sz=50","sz=300");        
+    }
+    mFriendFragment.mFriends.addAll(friends);
+  }       
+
+  if (mFriendFragment.mFriendListAdapter != null){
+    mFriendFragment.mFriendListAdapter.notifyDataSetChanged();
+  }
+
+  updateProfile();
+  updateFreeButton();
+}
+</code></pre>
+
+<p>If you run the app, the friends will load.</p>
+
+<h1>Congratulations!  You completed the codelab!</h1>
+
+<p>If you still have time, feel free to experiment with the APIs!</p>
+  </body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+    <link rel="stylesheet" type="text/css" href="/code.css" />
+  </head>
+  <body>
+<h1>Getting started</h1>
+
+<p>The application that you will be creating in this codelab will use Google+ and
+your social graph to let you notify if you are free.</p>
+
+<p>The Android client runs uses a Free server running on app engine and requires a Google API project
+that has the Google+ service enabled.  Let's get started!</p>
+
+<h2>Requirements</h2>
+
+<p>This codelab has the following requirements in order to ease setup and 
+development of the sample.</p>
+
+<ul>
+<li>A backend Free web service configured and running for the clients to send requests.  You should have set this up as the first part of the codelab.</li>
+<li>Your Free clients and server must define their OAuth 2.0 client settings within the same <a href="https://developers.google.com/console">Google APIs Console</a> project for all features to work correctly.</li>
+<li>A physical device to use for developing and testing because Google Play services cannot be installed on an emulator.</li>
+<li>The latest version of the <a href="http://developer.android.com/sdk/index.html">Android SDK</a>, including the SDK Tools component. The SDK is available from the Android SDK Manager.</li>
+<li>Eclipse configured to use Java 1.6</li>
+<li>The Google Play services SDK:
+<ul>
+<li>Launch Eclipse and select Window > Android SDK Manager or run android from the command line.</li>
+<li>Scroll to the bottom of the package list and select Extras > Google Play services. The package is downloaded to your computer and installed in your SDK environment at <android-sdk-folder>/extras/google/google_play_services.</li>
+</ul></li>
+<li>The <a href="http://actionbarsherlock.com/">ActionBarSherlock library</a>.</li>
+</ul>
+
+<h2>Step 1: Set up a Free backend server</h2>
+
+<p>Follow the <a href="../java-server/step0.html">instructions for setting up a backend server</a> and ensure that you can see the user interface.</p>
+
+<h2>Step 2: Add an Android Client ID to your project</h2>
+
+<p>You need to add a client ID to your existing project that will be used by your android client. You can do this by 
+navigating to 'API Access' for your project with the <a href="http://code.google.com/apis/console">Google APIs Console</a>.</p>
+
+<ol>
+<li>In the API Access pane, create an OAuth 2.0 client ID by clicking Create another client ID.</li>
+<li>Choose Installed application as your Application type and select Android as type.</li>
+<li><p>In the Package name field, enter your Android's app's package name. The package name used by the sample app is:</p>
+
+<pre><code>com.google.plus.samples.free
+</code></pre></li>
+<li><p>In a terminal, run the the Keytool utility to get the SHA-1 fingerprint of the certificate.</p>
+
+<pre><code>keytool -exportcert -alias androiddebugkey -keystore &lt;path-to-debug-or-production-keystore&gt; -list -v
+</code></pre>
+
+<p>Note: For Eclipse, the debug keystore is typically located at ~/.android/debug.keystore.</p></li>
+<li><p>The keytool prompts you to enter a password for the keystore. The default password for the debug keystore is android. Keytool then prints the fingerprint to the shell. For example:</p>
+
+<pre><code>Certificate fingerprint:
+      SHA1: DA:39:A3:EE:5E:6B:4B:0D:32:55:BF:EF:95:60:18:90:AF:D8:07:09
+</code></pre></li>
+<li><p>Paste the SHA-1 fingerprint into the Signing certificate fingerprint field and click the Create client ID button.</p></li>
+<li>To activate interactive posts, enable the Deep Linking option.</li>
+</ol>
+
+<h2>Step 3: Setup the project in Eclipse</h2>
+
+<p><a href="https://io2013-codelab.appspot.com/zip/free-android-client.zip">Download and extract a ZIP file</a> of the project.</p>
+
+<ol>
+<li>Download <a href="http://actionbarsherlock.com/">ActionBarSherlock library</a> and unzip it.</li>
+<li>Launch Eclipse.</li>
+<li>Select <strong>File > Import > Android > Existing Android Code into Workspace</strong> and click <strong>Next</strong>.</li>
+<li>Select <strong>Browse....</strong> Enter the path to your Free Android client directory.
+<ul>
+<li>Import the <a href="http://actionbarsherlock.com/">ActionBarSherlock library</a> library project:</li>
+<li>Select <strong>File > Import > Android > Existing Android Code into Workspace</strong> and click <strong>Next</strong>.</li>
+<li>Click <strong>Browse....</strong> Enter <actionbarsherlock-folder>/actionbarsherlock/.</li>
+<li>Click <strong>Finish</strong> to import.</li>
+</ul></li>
+<li>Import the Google Play services library project.
+<ul>
+<li>Select <strong>File > Import > Android > Existing Android Code into Workspace</strong> and click <strong>Next</strong>.</li>
+<li>Select Browse.... Enter <android-sdk-folder>/extras/google/google_play_services/.</li>
+<li>Select google-play-services_lib. Click <strong>Finish</strong> to import.</li>
+</ul></li>
+<li>Update the Free project properties:
+<ul>
+<li>Click <strong>Project > Properties</strong>. The project properties dialog displays.</li>
+<li>Select <strong>Java Build Path</strong>, and click the <strong>Libraries</strong> tab.</li>
+<li>Click <strong>Add External JARs</strong>, browse to <android-sdk-folder>/extras/android/support/v4/android-support-v4.jar. Click <strong>OK</strong>.</li>
+<li>Select <strong>Android</strong> in the left navigation.</li>
+<li>Click <strong>Add...</strong> and select <strong>actionbarsherlock</strong> to add the ActionBarSherlock library project dependency.</li>
+<li>Click <strong>Add...</strong> and select <strong>google-play-service_lib</strong> to add the Google Play services library project dependency. </li>
+</ul></li>
+<li>Click <strong>OK</strong>.</li>
+<li>Edit the src/config.properties file and modify the api_host property to be the hostname of a Free server.</li>
+<li>Connect your Android device by USB to your system.</li>
+<li>Select <strong>Run > Run</strong> to test the Free sample app. Choose Android application if prompted. The sample application will launch on your device.</li>
+</ol>
+
+<hr />
+
+<p>Move on to <a href="step1.html"><strong>Step 1</strong></a></p>
+  </body>
+</html>

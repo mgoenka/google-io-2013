@@ -1,0 +1,14 @@
+---
+build.dart --machine --full
+[{"method":"mapping","params":{"from":"web/index.html","to":"web/out/index.html"}}]
+Total time spent on web/index.html                           -- 751 ms
+Total time                                                   -- 773 ms
+Build finished!
+build.dart finished [1143 ms]
+
+---
+build.dart --machine --changed=web/out/_from_packages/writer/document.dart --changed=web/out/_from_packages/wri...
+Total time                                                   --  24 ms
+Build finished!
+build.dart finished [504 ms]
+

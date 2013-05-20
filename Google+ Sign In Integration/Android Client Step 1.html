@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+    <link rel="stylesheet" type="text/css" href="/code.css" />
+  </head>
+  <body>
+<h1>Part I: Authorizing the user and reflecting their profile</h1>
+
+<p>At this point you should have an empty application running. The UI shows
+the Profile and Friends as tabs that you can click to switch out fragments.</p>
+
+<h2>Step 1: Render the sign-in button</h2>
+
+<p>For this step, start in FreeActivity.java</p>
+
+<p>Let's start by initializing the Google API client and the Google+ Android
+client so that we can render the sign-in button.</p>
+
+<p>Uncomment the following lines of code in the onCreate method.</p>
+
+<pre><code>mApiClient = new ApiClient();
+
+// Create the PlusClientFragment which will initiate authentication if
+// required.
+// AuthUtil.SCOPES describe the permissions that we are requesting of
+// the user to access their information and write to their moments vault.
+// AuthUtil.VISIBLE_ACTIVITIES describe the types of moment which we can
+// read from or write to the user's vault.    
+mPlus = PlusClientFragment.getPlusClientFragment(this, ApiClient.SCOPES,
+    ApiClient.VISIBLE_ACTIVITIES);
+
+mSignInButton = (SignInButton) getLayoutInflater().inflate(
+    R.layout.sign_in_button, null);
+
+mSignInButton.setOnClickListener(this);
+
+// For profile UI
+updateFreeButton();
+
+// For friends UI        
+mLoaderMgr = getSupportLoaderManager();
+mFriendsLoader = 
+    (JsonTaskLoader&lt;List&lt;User&gt;&gt;)mLoaderMgr.initLoader(0, null, this);
+</code></pre>
+
+<p>This will initialize the variables that we need to use to render the sign-in 
+button.</p>
+
+<p>If you run the app now, the sign-in button will render. Clicking it doesn't do
+anything yet.</p>
+
+<h2>Step 2: Make the button clickable</h2>
+
+<p>Uncomment the click handler that was just initialized.</p>
+
+<pre><code>/**
+ * Click handler for the View that triggers sign-in.
+ * @param view The View object containing click data.
+ */
+@Override
+public void onClick(View view) {
+  if (view.getId() == R.id.sign_in_button) {
+    mPlus.signIn(REQUEST_CODE_PLUS_CLIENT_FRAGMENT);
+  }
+}
+</code></pre>
+
+<p>Now if you run the app and click the button, the sign-in dialog will appear.</p>
+
+<p>Before continuing, uncomment the requireSignIn function to ensure the user
+is signed in before presenting UI.  The following code shows the lines to 
+uncomment:</p>
+
+<pre><code>protected boolean requireSignIn() {
+  if (!mPlus.isAuthenticated()) {
+    mPlus.signIn(REQUEST_CODE_PLUS_CLIENT_FRAGMENT);
+    return false;
+  } else {
+    return true;
+  }
+}
+</code></pre>
+
+<h2>Step 3: Authorize the user with Google</h2>
+
+<p>When the user authorizes the app, a call back, onSignedIn, is invoked. This
+will pass a Google+ client that can immediately be used for API calls.</p>
+
+<p>Uncomment the onSignedIn method:</p>
+
+<pre><code>public void onSignedIn(PlusClient plusClient) {
+  if (plusClient.isConnected()) {
+    mPlusPerson = plusClient.getCurrentPerson();
+
+    // Retrieve the account name of the user which allows us to retrieve
+    // the OAuth access token that we securely pass over to the Free 
+    // service to identify and authenticate our user there.
+    final String name = plusClient.getAccountName();
+
+    // Asynchronously authenticate with the Free service and
+    // retrieve the associated Free profile for the user.
+    mAuthTask = new AsyncTask&lt;Object, Void, User&gt;() {
+      @Override
+      protected User doInBackground(Object... o) {
+        return ApiClient.authenticate(FreeActivity.this, name);
+      }
+
+      @Override
+      protected void onPostExecute(User result) {
+        if (result != null) {
+          setAuthenticatedProfile(result);
+        } else {
+          signOut();
+        }
+      }
+    };
+
+    mAuthTask.execute();
+  }
+}
+</code></pre>
+
+<p>Uncomment the Authentication method in ApiClient.java</p>
+
+<p>When you uncomment this, the ApiClient class will perform the authorizaton for
+the currently selected user against the Java server backend. The following code 
+block shows the full method:</p>
+
+<pre><code>public static User authenticate(Context ctx, String account) {
+    HttpURLConnection urlConnection = null;
+    OutputStream outStream = null;
+    String response = null;
+    int statusCode = 0;
+
+    try {
+        URL url = new URL(API_CONNECT);
+
+        sAccessToken = GoogleAuthUtil.getToken(ctx, account, SCOPE_STRING);
+
+        Log.v(TAG, "Authenticating at [" + url + "] with: " + sAccessToken);
+
+        byte[] postBody = String.format(ACCESS_TOKEN_JSON, sAccessToken).getBytes();
+
+        urlConnection = (HttpURLConnection) url.openConnection();
+        urlConnection.setRequestMethod("POST");
+        urlConnection.setAllowUserInteraction(false);
+        urlConnection.setDoOutput(true);
+        urlConnection.setRequestProperty("User-Agent", USER_AGENT);
+        urlConnection.setRequestProperty("Content-Type", "application/json");
+
+        outStream = urlConnection.getOutputStream();
+        outStream.write(postBody);
+
+        statusCode = urlConnection.getResponseCode();
+
+        if (statusCode == 200) {
+            User result = null;
+            String[] cookies = urlConnection.getHeaderField("set-cookie").split(";");
+            for (String cookie : cookies) {
+                if (cookie.trim().startsWith("JSESSIONID")) {
+                    InputStream responseStream = urlConnection.getInputStream();
+                    byte[] responseBytes = getContent(responseStream).toByteArray();
+                    response = new String(responseBytes, "UTF-8");
+
+                    if (!TextUtils.isEmpty(response)) {
+                        result = new Gson().fromJson(response, User.class);
+                    }
+
+                    sCookies = cookie;
+                    break;
+                }
+            }
+
+            Log.v(TAG, "Authenticated: " + response);
+            result.googlePublicProfilePhotoUrl = 
+                result.googlePublicProfilePhotoUrl.replace("sz=50", "sz=300");
+            return result;
+        } else { 
+            response = getErrorResponse(urlConnection);
+
+            Log.w(TAG, "HTTP Status (" + statusCode + ") while authenticating: " + response);
+            GoogleAuthUtil.invalidateToken(ctx, sAccessToken);
+            return null;
+        }
+    } catch (MalformedURLException e) {
+        Log.e(TAG, e.getMessage(), e);
+    } catch (IOException e) {
+        Log.e(TAG, e.getMessage(), e);
+    } catch (GoogleAuthException e) {
+        GoogleAuthUtil.invalidateToken(ctx, sAccessToken);
+    } catch (JsonParseException jsonException) {
+        Log.e(TAG, "Unable to parse the json response from: " + API_CONNECT,
+                jsonException);
+        Log.e(TAG, "Response was: " + response);
+    } finally {
+        if (urlConnection != null) {
+            urlConnection.disconnect();
+        }
+
+        if (outStream != null) {
+            try {
+                outStream.close();
+            } catch (IOException e) {
+                Log.e(TAG, e.getMessage(), e);
+            }
+        }
+    }
+    return null;
+}
+</code></pre>
+
+<p>Now that you have profile information, you are ready to present it to the user.
+In the FreeActivity, this is done in the <strong>setAuthenticatedProfile</strong> method. </p>
+
+<p>Return to FreeActivity.java</p>
+
+<p>Uncomment this method:</p>
+
+<pre><code>public void setAuthenticatedProfile(User profile) {
+  mFreeUser = profile;
+
+  supportInvalidateOptionsMenu();
+
+  // For profile
+  updateFreeButton();
+  updateProfile();             
+}
+</code></pre>
+
+<p>If you run the app now, the user profile will be reflected back after sign-in.
+At this point, the functionality to set/get the user as Free should work as 
+well. When you click the Free button, the Free state is set in the Free Android
+client and then the API call is made to set the authorized user's free status
+on the backend.</p>
+
+<p>The authorized API is also enabled now. If you click the menu button, options
+to sign out and disconnect are available. This is because in the UI code for
+actionbar, the authorized state is used to switch these off and on.</p>
+
+<hr />
+
+<p>Move on to <a href="step2.html"><strong>Step 2</strong></a></p>
+  </body>
+</html>

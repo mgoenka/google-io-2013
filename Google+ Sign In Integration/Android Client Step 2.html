@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+    <link rel="stylesheet" type="text/css" href="/code.css" />
+  </head>
+  <body>
+<h1>Part II: Disconnect and Sign-out</h1>
+
+<p>Now that the user can log in, and the Sign out / Disconnect UI is showing, it's
+time to let the user disconnect or switch accounts.</p>
+
+<h2>Step 1. Enable disconnect from the API client</h2>
+
+<p>Start in ApiClient.java</p>
+
+<p>Uncomment the <strong>disconnectAccount</strong> method to trigger the ApiClient method that
+will perform the disconnect using the server.</p>
+
+<p>The following code block shows the method once it's uncommented:</p>
+
+<pre><code>JsonTask&lt;Void&gt; task = new JsonTask&lt;Void&gt;(API_DISCONNECT, callback, Void.class) {
+    { mRequestMethod = "POST"; }
+};
+task.execute();
+</code></pre>
+
+<p>The API endpoint will be called to disconnect the currently signed in user.</p>
+
+<p>Next, uncomment the invalidate session code which will reset the client state.</p>
+
+<pre><code>public static void invalidateSession() {
+  sAccessToken = null;
+  sCookies = null;
+}
+</code></pre>
+
+<p>You can now disconnect the user from the app.</p>
+
+<h2>Step 2. Enable sign-out.</h2>
+
+<p>Return to the file FreeActivity.java</p>
+
+<p>Uncomment the sign-out code to enable switching profiles:</p>
+
+<pre><code>/**
+ * Clears the user profile and signs the user out from Google+ to allow
+ * the user to switch accounts.
+ */
+protected void signOut() {
+  ApiClient.invalidateSession();
+  setAuthenticatedProfile(null);
+  mPlusPerson = null;
+  mPlus.signOut();
+}
+</code></pre>
+
+<p>Now, when you run the app, you are able to sign out and disconnect your 
+account.</p>
+
+<hr />
+
+<p>Move on to <a href="step3.html"><strong>Step 3</strong></a></p>
+  </body>
+</html>

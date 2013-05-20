@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+    <link rel="stylesheet" type="text/css" href="/code.css" />
+  </head>
+  <body>
+<h1>Getting started</h1>
+
+<p>The application that you will be creating in this codelab will use Google+ and
+your social graph to let you notify your social graph that you are free.</p>
+
+<p>The Java server runs on top of app engine and requires a Google API project
+that has the Google+ service enabled.  Let's get started!</p>
+
+<h2>Requirements</h2>
+
+<p>This codelab has the following requirements in order to ease setup and 
+development of the sample.</p>
+
+<ul>
+<li>Java 1.6 or higher</li>
+<li>Eclipse IDE for Java Developers</li>
+<li>Google Plugin for Eclipse</li>
+<li><a href="https://developers.google.com/appengine/downloads#Google_App_Engine_SDK_for_Java">Google App Engine SDK for Java</a>.</li>
+</ul>
+
+<h2>Step 1: Create a Google App Engine Project</h2>
+
+<p>You can use the Google App Engine SDK to execute the sample application on a 
+local development server.</p>
+
+<ol>
+<li>Navigate to the <a href="https://appengine.google.com/">Google App Engine Admin Console</a>.</li>
+<li>Click <strong>Create Application</strong>.</li>
+<li>Choose an application identifier for your app:
+<ul>
+<li>Type an unique Application Identifier into the text box.</li>
+<li>Verify that the identifier is available by clicking <strong>Check Availability</strong>. If not available, try a new identifier.</li>
+<li>Note or copy the Application Identifier for use in a later step.</li>
+</ul></li>
+<li>Click <strong>Create Application</strong>.</li>
+</ol>
+
+<h2>Step 2: Enable the Google+ API</h2>
+
+<p>You need to enable the Google+ API for your app. You can do this by creating a 
+project for your app in the <a href="http://code.google.com/apis/console">Google APIs Console</a>.</p>
+
+<p>To create an APIs Console project, create an OAuth 2.0 client ID, and register your JavaScript origins and redirect URIs:</p>
+
+<ol>
+<li>In the <a href="http://code.google.com/apis/console">Google APIs Console</a>, select <strong>Create</strong> from the pull-down menu on the left, and enter a project name (such as "Sample").</li>
+<li>In the <strong>Services</strong> pane, enable the <strong>Google+ API</strong> and any other APIs that your app requires.</li>
+<li><p>In the <strong>API Access</strong> pane, click <strong>Create an OAuth 2.0 Client ID</strong>.</p>
+
+<ul>
+<li>In the Product name field, enter a name for your application (such as "Sample"), and click Next. Providing a product logo is optional.</li>
+<li><p>In the Client ID Settings section, do the following:</p>
+
+<ul>
+<li>Select <strong>Web application</strong> for the Application type.</li>
+<li>Click the <strong>more options</strong> link.</li>
+<li>In the <strong>Authorized Redirect URIs</strong> field, delete the example URI.</li>
+<li><p>In the <strong>Authorized JavaScript Origins</strong> field, add the following URLs.</p>
+
+<p>http://localhost:8888 <br />
+http://<strong>&lt;YOUR-APP-ID&gt;</strong>.appspot.com <br />
+https://<strong>&lt;YOUR-APP-ID&gt;</strong>.appspot.com  </p>
+
+<p><em>(Replace YOUR_APP_ID with the identifier for your app.)</em></p></li>
+</ul></li>
+<li><p>Click the <strong>Create client ID</strong> button.</p></li>
+</ul></li>
+<li>In the <strong>API Access</strong> pane, locate the section <strong>Client ID for web applications</strong> 
+and note or copy the <strong>Client ID</strong> and <strong>Client secret</strong> that you will need later to 
+run the sample</li>
+</ol>
+
+<h2>Step 3: Setup the application</h2>
+
+<p><a href="https://io2013-codelab.appspot.com/zip/free-java-server.zip">Download and extract a ZIP file</a> of the project.</p>
+
+<ol>
+<li>Open Eclipse and switch perspectives to use the Java perspective: <strong>Window ->Open perspective->Other</strong> and choose <strong>Java</strong>.</li>
+<li>Select <strong>File->Import</strong> and choose <strong>General->Existing projects into workspace</strong>.</li>
+<li>Choose <strong>Select root directory</strong> and browse to the &lt;path to your unzip directory&gt;/java-server directory. The Free Java project is selected.</li>
+<li>Click <strong>Finish</strong>.</li>
+<li><strong>Notice that your project was imported but it has errors</strong>.</li>
+<li>Select <strong>Project->Properties</strong>. In the Properties dialog, navigate to <strong>Google-> AppEngine</strong> and check <strong>Use Google App Engine</strong>. Click <strong>OK</strong>. This copies the Google App Engine jars and creates the configuration for the installed version of Google App Engine.</li>
+<li>Edit the <strong>war/WEB-INF/appengine-web.xml</strong> file, insert your Google App Engine application identifier that you created in step 1 in the <strong>&lt;application&gt;</strong> element, and save the file.</li>
+<li>Run the project by selecting <strong>Run->Run as->Web application</strong>. If you do not see this option, open <strong>Run->Run configurations</strong> and click <strong>Apply</strong> without making any changes to force the option to appear.</li>
+<li>Navigate to <a href="http://localhost:8888">http://localhost:8888</a> to try the app.</li>
+</ol>
+
+<p>Congratulations!  At this point you should have the skeleton for the app running as your server!</p>
+
+<hr />
+
+<p>Move on to <a href="step1.html"><strong>Step 1</strong></a></p>
+  </body>
+</html>

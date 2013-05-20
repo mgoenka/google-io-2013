@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+    <link rel="stylesheet" type="text/css" href="/code.css" />
+  </head>
+  <body>
+<h1>Step 3: Disconnect the App</h1>
+
+<h2>The client disconnect button and JavaScript</h2>
+
+<p>Before we can disconnect, we'll need a button in the JavaScript client
+for calling the server disconnect endpoint.</p>
+
+<p>The following HTML should be added to index.html.</p>
+
+<pre><code>&lt;!-- Disconnect button goes here --&gt;
+&lt;button id='disconnect' class="button danger disconnect" 
+  onClick="helper.disconnect()" style="display:none"&gt;
+  Disconnect
+&lt;/button&gt;
+</code></pre>
+
+<p>Next, you will need to implement the helper for disconnecting.</p>
+
+<pre><code>// Disconnect code goes here
+// Revoke the access token.
+$.ajax({
+  type: 'POST',
+  url: this.rootUrl + this.apiBase  + '/disconnect',
+  contentType: 'application/json',
+  dataType: 'json',
+  success: function(result) {
+  console.log('revoke response: ' + result);
+
+  // reload the page          
+  window.location = window.location;
+  },
+  error: function(e) {
+    console.log(e);
+  }
+});
+</code></pre>
+
+<p>The client has now been setup to make API calls to the disconnect
+endpoint, you're ready to start working on that handler.</p>
+
+<h2>The disconnect endpoint</h2>
+
+<p>When you disconnect the user, you will need to do two things:</p>
+
+<ol>
+<li>Remove the user data</li>
+<li>Disconnect the user from Google+</li>
+</ol>
+
+<p>Let's walk through the code for doing this. You will start this step
+in the DisconnectServlet.java file found in:
+    com.google.plus.samples.free</p>
+
+<h2>1. Delete user data</h2>
+
+<p>When the user disconnects from the app, we will remove thier data. In your
+own apps, you should consider the implications of which data is deleted and
+also should ensure you're following the 
+<a href="https://developers.google.com/+/policies">Google+ Platform Developer Policies</a></p>
+
+<p>First, we'll add the following code to the doPost method to remove the users
+graph data and account data.</p>
+
+<pre><code>try {
+  checkAuthorization(req);
+  Long userId = Long.parseLong(req.getSession()
+      .getAttribute(CURRENT_USER_SESSION_KEY).toString());
+  List&lt;DirectedUserToUserEdge&gt; edges = ofy().load()
+      .type(DirectedUserToUserEdge.class)
+      .filter("ownerUserId", userId).list();
+  ofy().delete().entities(edges);
+  edges = ofy().load()
+      .type(DirectedUserToUserEdge.class)
+      .filter("friendUserId", userId).list();
+  for (DirectedUserToUserEdge edge : edges) {
+    edge.setFriendUserId(null);
+    ofy().save().entity(edge);
+  }
+  User user = ofy().load().type(User.class).id(userId).get();
+  ofy().delete().entity(user);
+</code></pre>
+
+<p>The associated data should now be deleted.</p>
+
+<h2>2. Send the token to revoke</h2>
+
+<p>The final steps we will take are to revoke the token associated with
+this user. Add the following code in the doPost handler to pass the
+user's access token to the revoke function:</p>
+
+<pre><code>  revokeToken(user.getGoogleAccessToken());
+
+  req.getSession().removeAttribute(CURRENT_USER_SESSION_KEY);
+  sendResponse(req, resp, new Message("Successfully disconnected."),
+      "photohunt#message");
+} catch (UserNotAuthorizedException e) {
+  sendError(resp, 401,
+      "Unauthorized request");
+} catch (IOException e) {
+  sendError(resp, 500,
+      "Failed to revoke token for given user: " + e.getMessage());
+}
+</code></pre>
+
+<h2>3. Revoking the token</h2>
+
+<p>Revocation is as simple as:</p>
+
+<pre><code>curl https://accounts.google.com/o/oauth2/revoke?token={token}
+</code></pre>
+
+<p>What we'll need to do is just get the token and pass it to the endpoint. The
+following code will perform the request.</p>
+
+<pre><code>protected static void revokeToken(String accessToken) throws IOException {
+  TRANSPORT.createRequestFactory().buildGetRequest(new GenericUrl(
+      String.format(
+          "https://accounts.google.com/o/oauth2/revoke?token=%s",
+          accessToken))).execute();
+}
+</code></pre>
+
+<p>You're done!  The application can now disconnect.</p>
+
+<hr />
+
+<p>Move on to <a href="../android-client/step0.html"><strong>Step 0</strong></a> of the Android client instructions!</p>
+  </body>
+</html>
